@@ -23,6 +23,7 @@ from franka_msgs.action import Homing, Move, Grasp
 from action_msgs.msg import GoalStatus
 from rclpy.duration import Duration
 from franka_rl_bridge.policy_inference import PolicyLoader
+from geometry_msgs.msg import PoseStamped
 
 # Define the PolicyRunner node -> Load the policy, receive joint states, run inference, send control commands
 class PolicyRunner(Node):
@@ -70,6 +71,7 @@ class PolicyRunner(Node):
         self.joint_velocities = np.array([0.0, 0.0, 0.0, 0.0, 0.0 , 0.0, 0.0, 0.0, 0.0])
         self.joint_names = None
         self.ee_pos = np.array([0.0, 0.0, 0.0])  # End-effector position
+        self.ee_orientation = np.array([1.0, 0.0, 0.0, 0.0])  # End-effector orientation but not in observations
         
         # Initialize the last action to zero
         self.last_action = torch.zeros((1, self.policy_loader.action_dim), device=self.policy_loader.device)
@@ -81,8 +83,18 @@ class PolicyRunner(Node):
 
         #---Subscription and Publisher Initialization---
         
-        # Callback group for allowing concurrent callbacks
+        # Callback group for allowing concurrent callbacks - MOVED UP
         self.callback_group = ReentrantCallbackGroup()
+        
+        # Create subscription to object pose from perception system
+        self.object_pose_subscription = self.create_subscription(
+            PoseStamped,
+            '/perception/object_pose',
+            self.object_pose_callback,
+            10,
+            callback_group=self.callback_group
+        )
+        self.get_logger().info("Subscribed to /perception/object_pose topic")
         
         # Create subscription to joint states, velocities, gripper states, and end-effector position
         self.subscription = self.create_subscription(
@@ -109,8 +121,8 @@ class PolicyRunner(Node):
         self.gripper_max_width = 0.08 # Max width for Franka Hand
         self.gripper_speed = 0.05 # Default speed (m/s)
         self.gripper_force = 30.0 # Default grasp force (N)
-        self.gripper_epsilon_inner = 0.01 # Tolerance for successful grasp
-        self.gripper_epsilon_outer = 0.01
+        self.gripper_epsilon_inner = 0.05 # Tolerance for successful grasp
+        self.gripper_epsilon_outer = 0.05
 
         # Action clients for gripper, Homing, Move and Grasp are action definitions
         self.homing_client = ActionClient(self, Homing, '/fr3_gripper/homing', callback_group=self.callback_group)
@@ -190,6 +202,27 @@ class PolicyRunner(Node):
         # Return the relative joint positions
         self.joint_positions = np.concatenate((joint_pos_arm, gripper_pos_processed)) - self.default_joints
         self.joint_velocities = np.concatenate((joint_vel_arm, gripper_vel))
+        
+    def object_pose_callback(self, msg):
+        """Process incoming object pose messages"""
+        # Extract position from the message
+        self.object_position = np.array([
+            msg.pose.position.x,
+            msg.pose.position.y,
+            msg.pose.position.z
+        ])
+        
+        # Extract orientation from the message
+        self.object_orientation = np.array([
+            msg.pose.orientation.w,  # Note: We put w first to match [1.0, 0.0, 0.0, 0.0] convention
+            msg.pose.orientation.x,
+            msg.pose.orientation.y,
+            msg.pose.orientation.z
+        ])
+        
+        if self.print_counter % self.print_frequency == 0:  # Only log occasionally
+            self.get_logger().info(f"Updated object position: {self.object_position}")
+            self.get_logger().info(f"Updated object orientation: {self.object_orientation}")
 
     def process_joint_commands(self, policy_output):
         """Convert policy outputs to joint position commands for the real robot.
@@ -310,6 +343,8 @@ class PolicyRunner(Node):
         # Dynamically update the object position if the grasp was successful
         if self.object_grasped:
             self.object_position = self.ee_pos.copy()
+            # Note: Could also update self.object_orientation based on end-effector orientation 
+            self.object_orientation = self.ee_orientation.copy()
 
         # Increment print counter
         self.print_counter += 1
