@@ -60,7 +60,7 @@ class PolicyRunner(Node):
         self.target_position = np.array([0.65, 0.2, 0.5, 1.0, 0.0, 0.0, 0.0])  # x,y,z,qw,qx,qy,qz
         
         # Define object position (this could come from a vision system)
-        self.object_position = np.array([0.4, -0.2, 0.055])  # x,y,z on table
+        self.object_position = np.array([0.4, -0.2, 0.03])  # x,y,z on table
         self.object_orientation = np.array([1.0, 0.0, 0.0, 0.0]) # Default orientation (identity quaternion)
         self.object_grasped = False # Flag to indicate if the object is currently grasped
 
