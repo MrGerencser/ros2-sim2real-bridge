@@ -61,7 +61,7 @@ class PolicyRunner(Node):
         self.target_position = np.array([0.5, 0.0, 0.5, 1.0, 0.0, 0.0, 0.0])  # x,y,z,qw,qx,qy,qz
         
         # Define object position (this could come from a vision system)
-        self.object_position = np.array([0.4, -0.2, 0.03])  # x,y,z on table
+        self.object_position = np.array([0.4, -0.2, -0.05])  # x,y,z on table
         self.object_orientation = np.array([1.0, 0.0, 0.0, 0.0]) # Default orientation (identity quaternion)
         self.object_grasped = False # Flag to indicate if the object is currently grasped
 
@@ -378,7 +378,7 @@ class PolicyRunner(Node):
 
                 # Handle gripper command
                 gripper_command = action[0, -1]
-                desired_gripper_state = 'closed' if gripper_command <= -1 else 'open'
+                desired_gripper_state = 'closed' if gripper_command <= 1.0 else 'open'
                 
                 # Execute gripper action if the state has changed
                 if desired_gripper_state != self.gripper_goal_state:
@@ -408,11 +408,10 @@ class PolicyRunner(Node):
                 self.execute_action(interpreted_actions)
                 # Update the last action
                 self.last_action = action.detach().clone()
-               
             # CASE 2: Policy is in hold position mode (during gripper closure)
             elif self.hold_position_active:
-                self.hold_position["gripper_command"] = -4.5
-                self.last_action[0, -1] = -4.5  # Update last action to reflect gripper command
+                self.hold_position["gripper_command"] = 1.0
+                self.last_action[0, -1] = 1.0  # Update last action to reflect gripper command
 
                 # Publish the hold position message
                 self.execute_action(self.hold_position)  
