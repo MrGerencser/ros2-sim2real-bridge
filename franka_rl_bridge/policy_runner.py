@@ -58,7 +58,7 @@ class PolicyRunner(Node):
         self.policy_loader = PolicyLoader(policy_path, device)
         
         # Define target object position (this could be made configurable)
-        self.target_position = np.array([0.65, 0.2, 0.5, 1.0, 0.0, 0.0, 0.0])  # x,y,z,qw,qx,qy,qz
+        self.target_position = np.array([0.5, 0.0, 0.5, 1.0, 0.0, 0.0, 0.0])  # x,y,z,qw,qx,qy,qz
         
         # Define object position (this could come from a vision system)
         self.object_position = np.array([0.4, -0.2, 0.03])  # x,y,z on table
